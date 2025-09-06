@@ -21,6 +21,8 @@ pub mod worktree_store;
 
 #[cfg(test)]
 mod project_tests;
+#[cfg(test)]
+mod git_worktree_tests;
 
 mod direnv;
 mod environment;
