@@ -495,10 +495,19 @@ impl RealGitRepository {
         git_binary_path: Option<PathBuf>,
         executor: BackgroundExecutor,
     ) -> Option<Self> {
-        // For worktrees, dotgit_path might be a file containing "gitdir: /path/to/main/.git/worktrees/name"
-        // Use git2::Repository::discover to properly handle both regular repos and worktrees
+        // Try direct open first for security (avoids directory traversal)
         let workdir_root = dotgit_path.parent()?;
-        let repository = git2::Repository::discover(workdir_root).log_err()?;
+        let repository = if let Ok(repo) = git2::Repository::open(workdir_root) {
+            // Standard repository opened successfully
+            repo
+        } else if dotgit_path.is_file() {
+            // For worktrees, .git is a file containing "gitdir: /path/to/main/.git/worktrees/name"
+            // Only use discover() when we detect a worktree .git file to avoid unnecessary traversal
+            git2::Repository::discover(workdir_root).log_err()?
+        } else {
+            // Not a repository and not a worktree
+            return None;
+        };
         Some(Self {
             repository: Arc::new(Mutex::new(repository)),
             git_binary_path: git_binary_path.unwrap_or_else(|| PathBuf::from("git")),
